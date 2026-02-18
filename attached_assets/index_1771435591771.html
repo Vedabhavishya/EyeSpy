@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Eye Detection AI</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HOME -->
+  <div id="homeSection">
+    <h1>👁 Eye Detection AI</h1>
+    <p class="subtitle">
+      Upload an image or use live webcam to detect eyes using YOLO.
+    </p>
+
+    <button onclick="openUpload()">Upload Image</button>
+    <button onclick="openLive()">Live Detection</button>
+  </div>
+
+  <!-- UPLOAD -->
+  <div id="uploadSection" class="hidden">
+    <button class="backBtn" onclick="goHome()">← Back</button>
+
+    <h2>Upload Image</h2>
+    <input type="file" id="imageInput">
+    <button onclick="uploadImage()">Detect</button>
+
+    <div class="image-row">
+      <div>
+        <h3>Original</h3>
+        <img id="originalImage">
+      </div>
+      <div>
+        <h3>Detected</h3>
+        <img id="resultImage">
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE -->
+  <div id="liveSection" class="hidden">
+    <button class="backBtn" onclick="goHome()">← Back</button>
+
+    <h2>Live Detection</h2>
+
+    <!-- SINGLE TOGGLE BUTTON -->
+    <button id="liveToggleBtn" onclick="toggleLive()">
+      Start Webcam
+    </button>
+
+    <img id="liveStream" class="live-full">
+  </div>
+
+</div>
+
+<script src="/static/script.js"></script>
+</body>
+</html>

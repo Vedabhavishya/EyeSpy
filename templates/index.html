@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionAI | Precision Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glass-background"></div>
+    
+    <div class="container">
+        <!-- NAVIGATION -->
+        <nav class="nav-bar">
+            <div class="logo" onclick="goHome()">Vision<span>AI</span></div>
+            <div class="nav-links">
+                <button class="nav-btn" onclick="openUpload()">Image Analysis</button>
+                <button class="nav-btn" onclick="openLive()">Live Stream</button>
+            </div>
+        </nav>
+
+        <!-- HOME SECTION -->
+        <main id="homeSection" class="content-section">
+            <div class="hero">
+                <h1>Advanced Eye Detection</h1>
+                <p class="subtitle">Experience real-time neural network powered vision. Precise, fast, and accessible directly from your browser.</p>
+                <div class="hero-actions">
+                    <button class="btn-primary" onclick="openUpload()">Get Started</button>
+                    <button class="btn-secondary" onclick="openLive()">Try Live</button>
+                </div>
+            </div>
+            <div class="features">
+                <div class="feature-card">
+                    <div class="icon">📸</div>
+                    <h3>Static Analysis</h3>
+                    <p>Upload high-resolution images for detailed eye feature detection.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🎥</div>
+                    <h3>Real-time Feed</h3>
+                    <p>Low-latency webcam processing with live annotations.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">🧠</div>
+                    <h3>YOLO Driven</h3>
+                    <p>Powered by state-of-the-art object detection algorithms.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- UPLOAD SECTION -->
+        <section id="uploadSection" class="content-section hidden">
+            <header class="section-header">
+                <button class="btn-icon" onclick="goHome()">←</button>
+                <h2>Image Analysis</h2>
+            </header>
+            
+            <div class="upload-controls">
+                <label for="imageInput" class="custom-file-upload">
+                    <span>Choose Image</span>
+                    <input type="file" id="imageInput" accept="image/*" onchange="previewImage()">
+                </label>
+                <button class="btn-primary" onclick="uploadImage()">Run Detection</button>
+            </div>
+
+            <div class="results-grid">
+                <div class="image-box">
+                    <span class="label">Input</span>
+                    <div class="img-wrapper">
+                        <img id="originalImage" src="https://via.placeholder.com/400x300?text=Awaiting+Upload" alt="Original">
+                    </div>
+                </div>
+                <div class="image-box">
+                    <span class="label">Result</span>
+                    <div class="img-wrapper">
+                        <img id="resultImage" src="https://via.placeholder.com/400x300?text=Result+Output" alt="Detected">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LIVE SECTION -->
+        <section id="liveSection" class="content-section hidden">
+            <header class="section-header">
+                <button class="btn-icon" onclick="goHome()">←</button>
+                <h2>Webcam Vision</h2>
+            </header>
+
+            <div class="live-controls">
+                <button id="liveToggleBtn" class="btn-primary" onclick="toggleLive()">Start Intelligence Feed</button>
+            </div>
+
+            <div class="live-viewer">
+                <div class="viewer-wrapper">
+                    <img id="liveStream" src="" alt="Live feed will appear here">
+                    <div id="noFeed" class="status-overlay">Camera Offline</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 VisionAI. Built with Flask & YOLO.</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
