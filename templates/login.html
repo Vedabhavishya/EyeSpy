@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EyeSpy | Authentication</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="glass-background"></div>
+
+<div class="container auth-container">
+    <div class="auth-card">
+        <div class="logo">Eye<span>Spy</span></div>
+        <h2 id="authTitle">Welcome Back</h2>
+        <p id="authSubtitle" class="subtitle">Please sign in to access your telemetry</p>
+        
+        <form id="authForm" onsubmit="submitAuth(event)">
+            <div class="input-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" placeholder="Enter your email address" required autocomplete="email">
+            </div>
+            
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+            </div>
+            
+            <div id="authError" class="auth-error-box hidden"></div>
+            
+            <button type="submit" id="authBtn" class="btn-primary auth-submit-btn">
+                <span>Sign In</span>
+                <div class="spinner hidden"></div>
+            </button>
+        </form>
+        
+        <div class="auth-toggle">
+            <span id="toggleText">New to EyeSpy?</span>
+            <a href="#" id="toggleAuthBtn" onclick="toggleAuthMode(event)">Create an account</a>
+        </div>
+    </div>
+</div>
+
+<script>
+let isLoginMode = true;
+
+function toggleAuthMode(e) {
+    if (e) e.preventDefault();
+    isLoginMode = !isLoginMode;
+    
+    const title = document.getElementById('authTitle');
+    const subtitle = document.getElementById('authSubtitle');
+    const submitBtn = document.getElementById('authBtn').querySelector('span');
+    const toggleText = document.getElementById('toggleText');
+    const toggleBtn = document.getElementById('toggleAuthBtn');
+    const errorBox = document.getElementById('authError');
+    
+    errorBox.classList.add('hidden');
+    errorBox.textContent = '';
+    
+    if (isLoginMode) {
+        title.textContent = 'Welcome Back';
+        subtitle.textContent = 'Please sign in to access your telemetry';
+        submitBtn.textContent = 'Sign In';
+        toggleText.textContent = 'New to EyeSpy?';
+        toggleBtn.textContent = 'Create an account';
+        document.getElementById('password').autocomplete = 'current-password';
+    } else {
+        title.textContent = 'Create Account';
+        subtitle.textContent = 'Register a new profile to track monitoring sessions';
+        submitBtn.textContent = 'Sign Up';
+        toggleText.textContent = 'Already have an account?';
+        toggleBtn.textContent = 'Sign in instead';
+        document.getElementById('password').autocomplete = 'new-password';
+    }
+}
+
+async function submitAuth(e) {
+    e.preventDefault();
+    
+    const emailInput = document.getElementById('email').value.trim();
+    const passwordInput = document.getElementById('password').value;
+    const errorBox = document.getElementById('authError');
+    const submitBtn = document.getElementById('authBtn');
+    const spinner = submitBtn.querySelector('.spinner');
+    const btnText = submitBtn.querySelector('span');
+    
+    errorBox.classList.add('hidden');
+    errorBox.textContent = '';
+    
+    // Simple client-side regex check for email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailInput)) {
+        errorBox.textContent = 'Please enter a valid email address.';
+        errorBox.classList.remove('hidden');
+        return;
+    }
+    
+    if (passwordInput.length < 6) {
+        errorBox.textContent = 'Password must be at least 6 characters long.';
+        errorBox.classList.remove('hidden');
+        return;
+    }
+    
+    submitBtn.disabled = true;
+    spinner.classList.remove('hidden');
+    btnText.style.opacity = '0.5';
+    
+    const url = isLoginMode ? '/api/auth/login' : '/api/auth/signup';
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: emailInput,
+                password: passwordInput
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            window.location.href = '/';
+        } else {
+            errorBox.textContent = data.message || 'Authentication failed.';
+            errorBox.classList.remove('hidden');
+        }
+    } catch (err) {
+        errorBox.textContent = 'A connection error occurred. Please try again.';
+        errorBox.classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+        spinner.classList.add('hidden');
+        btnText.style.opacity = '1';
+    }
+}
+</script>
+</body>
+</html>

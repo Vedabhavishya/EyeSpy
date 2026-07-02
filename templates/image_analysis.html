@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EyeSpy | Image Analysis</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+<div class="glass-background"></div>
+
+<div class="container dashboard-container">
+
+<nav class="nav-bar">
+<div class="logo" onclick="window.location='/'">Eye<span>Spy</span></div>
+<div class="nav-links">
+<a href="/image-analysis" class="nav-btn active">Image Analysis</a>
+<a href="/live-stream" class="nav-btn">Live Stream</a>
+<a href="/driving-mode" class="nav-btn">Driving Mode</a>
+<a href="/history" class="nav-btn">History & Stats</a>
+<div class="user-profile">
+    <div class="avatar" onclick="toggleProfileMenu(event)">
+        <span>{{ session.get('email')[0].upper() }}</span>
+    </div>
+    <div class="profile-dropdown hidden" id="profileDropdown">
+        <div class="dropdown-header">
+            <span class="dropdown-email">{{ session.get('email') }}</span>
+        </div>
+        <a href="#" class="dropdown-item" onclick="openProfileModal(event)">
+            <span class="icon">👤</span> Update Profile
+        </a>
+        <a href="/logout" class="dropdown-item logout">
+            <span class="icon">🚪</span> Logout
+        </a>
+    </div>
+</div>
+</div>
+</nav>
+
+<header class="section-header">
+<button class="btn-icon" onclick="window.location='/'">←</button>
+<h2>Static Image Diagnostics</h2>
+</header>
+
+<div class="upload-controls">
+<label for="imageInput" class="custom-file-upload">
+<span>Choose Image</span>
+<input type="file" id="imageInput" accept="image/*" onchange="previewImage()">
+</label>
+<button class="btn-primary" onclick="uploadImage()">Run Diagnosis</button>
+</div>
+
+<div class="dashboard-grid">
+
+<!-- Left Panel: Image Views -->
+<div class="dashboard-left">
+<div class="results-grid">
+<div class="image-box">
+<span class="label">Uploaded Original</span>
+<div class="img-wrapper">
+<img id="originalImage" src="https://via.placeholder.com/400x300?text=Awaiting+Upload">
+</div>
+</div>
+
+<div class="image-box">
+<span class="label">Detection Overlay</span>
+<div class="img-wrapper">
+<img id="resultImage" src="https://via.placeholder.com/400x300?text=Result">
+</div>
+</div>
+</div>
+</div>
+
+<!-- Right Panel: PowerBI Diagnostic Metrics -->
+<div class="dashboard-right">
+<div class="chart-card report-card">
+<h3>Image Diagnostics Report</h3>
+
+<!-- KPI Cards -->
+<div class="bi-kpi-grid">
+<div class="bi-kpi-card" id="imgStatusCard">
+<span class="bi-kpi-label">Eyelid State</span>
+<span class="bi-kpi-val" id="imgValState">N/A</span>
+</div>
+<div class="bi-kpi-card">
+<span class="bi-kpi-label">Eyes Detected</span>
+<span class="bi-kpi-val" id="imgValEyes">0</span>
+</div>
+<div class="bi-kpi-card">
+<span class="bi-kpi-label">Head Roll Angle</span>
+<span class="bi-kpi-val" id="imgValTilt">0°</span>
+</div>
+</div>
+
+<!-- Progress/Gauge Metrics -->
+<div class="diagnostic-gauges">
+<div class="gauge-wrapper">
+<div class="gauge-header">
+<span>Left Eye EAR</span>
+<strong id="imgValLeftEar">0.00</strong>
+</div>
+<div class="progress-bar-bg">
+<div class="progress-bar-fill" id="fillLeftEar" style="width: 0%;"></div>
+</div>
+</div>
+
+<div class="gauge-wrapper">
+<div class="gauge-header">
+<span>Right Eye EAR</span>
+<strong id="imgValRightEar">0.00</strong>
+</div>
+<div class="progress-bar-bg">
+<div class="progress-bar-fill" id="fillRightEar" style="width: 0%;"></div>
+</div>
+</div>
+</div>
+
+<!-- Analysis Output Details -->
+<div class="diagnostic-feedback-box">
+<h4>Diagnostic Insights</h4>
+<p id="diagnosticFeedback">Please upload an image and click "Run Diagnosis" to analyze eyelid metrics.</p>
+</div>
+
+</div>
+</div>
+
+</div>
+
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>

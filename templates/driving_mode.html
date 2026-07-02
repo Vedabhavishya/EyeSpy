@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EyeSpy | Driving Mode</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+<div class="glass-background"></div>
+
+<div class="container">
+
+<nav class="nav-bar">
+<div class="logo" onclick="window.location='/'">Eye<span>Spy</span></div>
+<div class="nav-links">
+<a href="/image-analysis" class="nav-btn">Image Analysis</a>
+<a href="/live-stream" class="nav-btn">Live Stream</a>
+<a href="/driving-mode" class="nav-btn active">Driving Mode</a>
+<a href="/history" class="nav-btn">History & Stats</a>
+<div class="user-profile">
+    <div class="avatar" onclick="toggleProfileMenu(event)">
+        <span>{{ session.get('email')[0].upper() }}</span>
+    </div>
+    <div class="profile-dropdown hidden" id="profileDropdown">
+        <div class="dropdown-header">
+            <span class="dropdown-email">{{ session.get('email') }}</span>
+        </div>
+        <a href="#" class="dropdown-item" onclick="openProfileModal(event)">
+            <span class="icon">👤</span> Update Profile
+        </a>
+        <a href="/logout" class="dropdown-item logout">
+            <span class="icon">🚪</span> Logout
+        </a>
+    </div>
+</div>
+</div>
+</nav>
+
+<header class="section-header">
+<button class="btn-icon" onclick="window.location='/'">←</button>
+<h2>Driver Drowsiness HUD</h2>
+</header>
+
+<!-- Alert Audio Element -->
+<audio id="alertAudio" src="{{ url_for('static', filename='alert.wav') }}" preload="auto" loop></audio>
+
+<div class="live-controls">
+<button id="drivingToggleBtn" class="btn-primary" onclick="toggleDriving()">
+Start Monitoring
+</button>
+</div>
+
+<div class="live-viewer centered-viewer">
+<div class="viewer-wrapper" id="videoWrapper">
+<img id="drivingStream" src="" alt="Driver Monitoring Feed">
+<div id="drivingStatus" class="status-overlay">Camera Offline</div>
+<!-- Flashing danger overlay inside camera -->
+<div id="alarmOverlay" class="alarm-overlay hidden">
+<div class="alarm-text">DROWSINESS DETECTED</div>
+</div>
+</div>
+</div>
+
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>

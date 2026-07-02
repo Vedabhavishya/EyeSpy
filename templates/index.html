@@ -1,109 +1,153 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VisionAI | Precision Detection</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>EyeSpy | Precision Detection</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
 </head>
+
 <body>
-    <div class="glass-background"></div>
-    
-    <div class="container">
-        <!-- NAVIGATION -->
-        <nav class="nav-bar">
-            <div class="logo" onclick="goHome()">Vision<span>AI</span></div>
-            <div class="nav-links">
-                <button class="nav-btn" onclick="openUpload()">Image Analysis</button>
-                <button class="nav-btn" onclick="openLive()">Live Stream</button>
-            </div>
-        </nav>
 
-        <!-- HOME SECTION -->
-        <main id="homeSection" class="content-section">
-            <div class="hero">
-                <h1>Advanced Eye Detection</h1>
-                <p class="subtitle">Experience real-time neural network powered vision. Precise, fast, and accessible directly from your browser.</p>
-                <div class="hero-actions">
-                    <button class="btn-primary" onclick="openUpload()">Get Started</button>
-                    <button class="btn-secondary" onclick="openLive()">Try Live</button>
-                </div>
-            </div>
-            <div class="features">
-                <div class="feature-card">
-                    <div class="icon">📸</div>
-                    <h3>Static Analysis</h3>
-                    <p>Upload high-resolution images for detailed eye feature detection.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">🎥</div>
-                    <h3>Real-time Feed</h3>
-                    <p>Low-latency webcam processing with live annotations.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="icon">🧠</div>
-                    <h3>YOLO Driven</h3>
-                    <p>Powered by state-of-the-art object detection algorithms.</p>
-                </div>
-            </div>
-        </main>
+<div class="glass-background"></div>
 
-        <!-- UPLOAD SECTION -->
-        <section id="uploadSection" class="content-section hidden">
-            <header class="section-header">
-                <button class="btn-icon" onclick="goHome()">←</button>
-                <h2>Image Analysis</h2>
-            </header>
-            
-            <div class="upload-controls">
-                <label for="imageInput" class="custom-file-upload">
-                    <span>Choose Image</span>
-                    <input type="file" id="imageInput" accept="image/*" onchange="previewImage()">
-                </label>
-                <button class="btn-primary" onclick="uploadImage()">Run Detection</button>
-            </div>
+<div class="container">
 
-            <div class="results-grid">
-                <div class="image-box">
-                    <span class="label">Input</span>
-                    <div class="img-wrapper">
-                        <img id="originalImage" src="https://via.placeholder.com/400x300?text=Awaiting+Upload" alt="Original">
-                    </div>
-                </div>
-                <div class="image-box">
-                    <span class="label">Result</span>
-                    <div class="img-wrapper">
-                        <img id="resultImage" src="https://via.placeholder.com/400x300?text=Result+Output" alt="Detected">
-                    </div>
-                </div>
-            </div>
-        </section>
+<!-- NAVIGATION -->
+<nav class="nav-bar">
 
-        <!-- LIVE SECTION -->
-        <section id="liveSection" class="content-section hidden">
-            <header class="section-header">
-                <button class="btn-icon" onclick="goHome()">←</button>
-                <h2>Webcam Vision</h2>
-            </header>
+<div class="logo">
+<a href="/" style="text-decoration:none;color:white;">
+Eye<span>Spy</span>
+</a>
+</div>
 
-            <div class="live-controls">
-                <button id="liveToggleBtn" class="btn-primary" onclick="toggleLive()">Start Intelligence Feed</button>
-            </div>
+<div class="nav-links">
 
-            <div class="live-viewer">
-                <div class="viewer-wrapper">
-                    <img id="liveStream" src="" alt="Live feed will appear here">
-                    <div id="noFeed" class="status-overlay">Camera Offline</div>
-                </div>
-            </div>
-        </section>
+<a href="/image-analysis" class="nav-btn">
+Image Analysis
+</a>
+
+<a href="/live-stream" class="nav-btn">
+Live Stream
+</a>
+
+<a href="/driving-mode" class="nav-btn">
+Driving Mode
+</a>
+
+<a href="/history" class="nav-btn">
+History & Stats
+</a>
+
+<div class="user-profile">
+    <div class="avatar" onclick="toggleProfileMenu(event)">
+        <span>{{ session.get('email')[0].upper() }}</span>
     </div>
+    <div class="profile-dropdown hidden" id="profileDropdown">
+        <div class="dropdown-header">
+            <span class="dropdown-email">{{ session.get('email') }}</span>
+        </div>
+        <a href="#" class="dropdown-item" onclick="openProfileModal(event)">
+            <span class="icon">👤</span> Update Profile
+        </a>
+        <a href="/logout" class="dropdown-item logout">
+            <span class="icon">🚪</span> Logout
+        </a>
+    </div>
+</div>
 
-    <footer>
-        <p>&copy; 2026 VisionAI. Built with Flask & YOLO.</p>
-    </footer>
+</div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</nav>
+
+
+<!-- HOME SECTION -->
+<main class="content-section">
+
+<div class="hero">
+
+<h1>Advanced Eye Detection</h1>
+
+<p class="subtitle">
+Experience real-time Deep Learning powered vision. 
+Precise, fast, and accessible directly from your browser.
+</p>
+
+<div class="hero-actions">
+
+<a href="/image-analysis">
+<button class="btn-primary">Get Started</button>
+</a>
+
+<a href="/live-stream">
+<button class="btn-secondary">Try Live</button>
+</a>
+
+</div>
+
+</div>
+
+
+<div class="features">
+
+<div class="feature-card">
+
+<div class="icon">📸</div>
+
+<h3>Static Analysis</h3>
+
+<p>
+Upload high-resolution images for detailed eye feature detection.
+</p>
+
+</div>
+
+
+<div class="feature-card">
+
+<div class="icon">🎥</div>
+
+<h3>Real-time Feed</h3>
+
+<p>
+Low-latency webcam processing with live annotations.
+</p>
+
+</div>
+
+
+<div class="feature-card">
+
+<div class="icon">🧠</div>
+
+<h3>YOLO Driven</h3>
+
+<p>
+Powered by state-of-the-art object detection algorithms.
+</p>
+
+</div>
+
+</div>
+
+</main>
+
+</div>
+
+
+<footer>
+
+<p>&copy; 2026 EyeSpy. Built with Flask & YOLO.</p>
+
+</footer>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
 </body>
 </html>

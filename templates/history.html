@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EyeSpy | Historical Analytics</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<!-- Chart.js CDN for historical statistics -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+<div class="glass-background"></div>
+
+<div class="container analytics-container">
+
+<nav class="nav-bar">
+<div class="logo" onclick="window.location='/'">Eye<span>Spy</span></div>
+<div class="nav-links">
+<a href="/image-analysis" class="nav-btn">Image Analysis</a>
+<a href="/live-stream" class="nav-btn">Live Stream</a>
+<a href="/driving-mode" class="nav-btn">Driving Mode</a>
+<a href="/history" class="nav-btn active">History & Stats</a>
+<div class="user-profile">
+    <div class="avatar" onclick="toggleProfileMenu(event)">
+        <span>{{ session.get('email')[0].upper() }}</span>
+    </div>
+    <div class="profile-dropdown hidden" id="profileDropdown">
+        <div class="dropdown-header">
+            <span class="dropdown-email">{{ session.get('email') }}</span>
+        </div>
+        <a href="#" class="dropdown-item" onclick="openProfileModal(event)">
+            <span class="icon">👤</span> Update Profile
+        </a>
+        <a href="/logout" class="dropdown-item logout">
+            <span class="icon">🚪</span> Logout
+        </a>
+    </div>
+</div>
+</div>
+</nav>
+
+<header class="section-header">
+<button class="btn-icon" onclick="window.location='/'">←</button>
+<h2>Historical Analytics Dashboard</h2>
+</header>
+
+<!-- PowerBI style Control Panel / Filters -->
+<div class="dashboard-controls-panel">
+<div class="period-selectors">
+<button class="bi-filter-btn active" id="btnFilterAll" onclick="changePeriodFilter('all')">All Time</button>
+<button class="bi-filter-btn" id="btnFilter7d" onclick="changePeriodFilter('7days')">Last 7 Days</button>
+<button class="bi-filter-btn" id="btnFilter24h" onclick="changePeriodFilter('24hours')">Last 24 Hours</button>
+</div>
+<button class="btn-primary export-csv-btn" onclick="exportToCSV()">Export Data (CSV)</button>
+</div>
+
+<!-- Overall Summary KPIs -->
+<div class="metrics-summary-grid">
+<div class="summary-card">
+<span class="metric-label">Total Sessions</span>
+<span class="metric-value" id="totalSessions">0</span>
+</div>
+<div class="summary-card">
+<span class="metric-label">Total Monitored Time</span>
+<span class="metric-value" id="totalDuration">0 min</span>
+</div>
+<div class="summary-card">
+<span class="metric-label">Total Blinks Recorded</span>
+<span class="metric-value" id="totalBlinks">0</span>
+</div>
+<div class="summary-card">
+<span class="metric-label">Drowsy Events Triggered</span>
+<span class="metric-value" id="totalDrowsy">0</span>
+</div>
+</div>
+
+<!-- Charts Grid -->
+<div class="analytics-charts-grid">
+<div class="chart-card">
+<h3>Blinks & Drowsy Events Per Session</h3>
+<div class="chart-container">
+<canvas id="sessionComparisonChart"></canvas>
+</div>
+</div>
+<div class="chart-card">
+<h3>Driver Alertness Trend</h3>
+<div class="chart-container">
+<canvas id="alertnessTrendChart"></canvas>
+</div>
+</div>
+</div>
+
+<!-- History Table -->
+<div class="table-card">
+<div class="table-header">
+<div class="table-title-desc">
+<h3>Completed Sessions Log</h3>
+<span class="table-desc">Click any session row to drill down into detailed telemetry logs.</span>
+</div>
+<button class="btn-secondary danger-btn" onclick="clearHistory()">Clear All Logs</button>
+</div>
+<div class="table-wrapper">
+<table id="historyTable">
+<thead>
+<tr>
+<th>Date & Time</th>
+<th>Duration</th>
+<th>Total Blinks</th>
+<th>Drowsy Events</th>
+<th>Attentiveness Status</th>
+</tr>
+</thead>
+<tbody id="historyTableBody">
+<!-- Populated dynamically via JS -->
+<tr>
+<td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading session logs...</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+</div>
+
+<!-- DRILL-DOWN MODAL WINDOW -->
+<div id="sessionModal" class="modal hidden">
+<div class="modal-content">
+<div class="modal-header">
+<h3>Session Diagnostics Detail</h3>
+<span class="close-modal" onclick="closeSessionModal()">&times;</span>
+</div>
+<div class="modal-body">
+<div class="modal-kpi-grid">
+<div class="modal-kpi-card">
+<span class="modal-kpi-label">Driving Time</span>
+<strong id="modalValDuration">0s</strong>
+</div>
+<div class="modal-kpi-card">
+<span class="modal-kpi-label">Blinks Count</span>
+<strong id="modalValBlinks">0</strong>
+</div>
+<div class="modal-kpi-card">
+<span class="modal-kpi-label">Drowsy Alerts</span>
+<strong id="modalValDrowsy" class="danger-text">0</strong>
+</div>
+</div>
+
+<div class="modal-details-section">
+<div class="detail-item">
+<span class="detail-name">Session Start:</span>
+<span id="modalValStart" class="detail-val val-mono">-</span>
+</div>
+<div class="detail-item">
+<span class="detail-name">Session End:</span>
+<span id="modalValEnd" class="detail-val val-mono">-</span>
+</div>
+<div class="detail-item">
+<span class="detail-name">Average Blink Frequency:</span>
+<span id="modalValBlinkRate" class="detail-val">-</span>
+</div>
+<div class="detail-item">
+<span class="detail-name">Safety Status Assessment:</span>
+<span id="modalValStatus" class="detail-val">-</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>

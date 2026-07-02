@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EyeSpy | Live Stream</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="container">
+
+<nav class="nav-bar">
+<div class="logo" onclick="window.location='/'">Eye<span>Spy</span></div>
+<div class="nav-links">
+<a href="/image-analysis" class="nav-btn">Image Analysis</a>
+<a href="/live-stream" class="nav-btn active">Live Stream</a>
+<a href="/driving-mode" class="nav-btn">Driving Mode</a>
+<a href="/history" class="nav-btn">History & Stats</a>
+<div class="user-profile">
+    <div class="avatar" onclick="toggleProfileMenu(event)">
+        <span>{{ session.get('email')[0].upper() }}</span>
+    </div>
+    <div class="profile-dropdown hidden" id="profileDropdown">
+        <div class="dropdown-header">
+            <span class="dropdown-email">{{ session.get('email') }}</span>
+        </div>
+        <a href="#" class="dropdown-item" onclick="openProfileModal(event)">
+            <span class="icon">👤</span> Update Profile
+        </a>
+        <a href="/logout" class="dropdown-item logout">
+            <span class="icon">🚪</span> Logout
+        </a>
+    </div>
+</div>
+</div>
+</nav>
+
+<header class="section-header">
+<button class="btn-icon" onclick="window.location='/'">←</button>
+<h2>Live Webcam Detection</h2>
+</header>
+
+<div class="live-controls">
+<button id="liveToggleBtn" class="btn-primary" onclick="toggleLive()">
+Start Intelligence Feed
+</button>
+</div>
+
+<div class="live-viewer">
+
+<div class="viewer-wrapper">
+
+<img id="liveStream" src="" alt="Live feed">
+
+<div id="noFeed" class="status-overlay">Camera Offline</div>
+
+</div>
+
+</div>
+
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
