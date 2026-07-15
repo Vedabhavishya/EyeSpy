@@ -56,8 +56,10 @@ Start Monitoring
 
 <div class="live-viewer centered-viewer">
 <div class="viewer-wrapper" id="videoWrapper">
-<img id="drivingStream" src="" alt="Driver Monitoring Feed">
-<div id="drivingStatus" class="status-overlay">Camera Offline</div>
+    <video id="webcamVideo" autoplay playsinline style="display: none;"></video>
+    <canvas id="offscreenCanvas" style="display: none;"></canvas>
+    <img id="drivingStream" src="" alt="Driver Monitoring Feed">
+    <div id="drivingStatus" class="status-overlay">Camera Offline</div>
 <!-- Flashing danger overlay inside camera -->
 <div id="alarmOverlay" class="alarm-overlay hidden">
 <div class="alarm-text">DROWSINESS DETECTED</div>

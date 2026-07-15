@@ -506,6 +506,209 @@ def driving_mode():
 
     return render_template("driving_mode.html")
 
+driver_states = {}
+
+def get_driver_state(email):
+    if email not in driver_states:
+        driver_states[email] = {
+            "session_start": None,
+            "total_blinks": 0,
+            "drowsy_events": 0,
+            "blink_count": 0,
+            "blink_start_time": None,
+            "eye_closed_start_time": None,
+            "prev_state": "OPEN",
+            "prev_ear": 0.0,
+            "calibrated": False,
+            "calibration_count": 0,
+            "calibration_ears": [],
+            "calibrated_threshold": EAR_THRESHOLD,
+            "alert_active": False,
+            "last_db_write": 0.0,
+            "current_telemetry": {
+                "ear": 0.0,
+                "state": "OPEN",
+                "blink_rate": 0.0,
+                "total_blinks": 0,
+                "drowsy": False,
+                "drowsy_events": 0,
+                "active_seconds": 0
+            }
+        }
+    return driver_states[email]
+
+@app.route('/api/start-session', methods=['POST'])
+@login_required
+def api_start_session():
+    email = session.get('email')
+    if email in driver_states:
+        del driver_states[email]
+    
+    state = get_driver_state(email)
+    state["session_start"] = datetime.now()
+    state["blink_start_time"] = time.time()
+    state["eye_closed_start_time"] = time.time()
+    state["last_db_write"] = time.time()
+    return jsonify({"success": True, "message": "Session started."})
+
+@app.route('/api/stop-session', methods=['POST'])
+@login_required
+def api_stop_session():
+    email = session.get('email')
+    state = get_driver_state(email)
+    if state["session_start"]:
+        end_time = datetime.now()
+        duration_seconds = (end_time - state["session_start"]).total_seconds()
+        save_session(state["session_start"], end_time, duration_seconds, state["total_blinks"], state["drowsy_events"], email)
+        state["session_start"] = None
+    if email in driver_states:
+        del driver_states[email]
+    return jsonify({"success": True, "message": "Session stopped and saved."})
+
+@app.route('/api/process-frame', methods=['POST'])
+@login_required
+def api_process_frame():
+    import base64
+    email = session.get('email')
+    state = get_driver_state(email)
+    
+    data = request.get_json() or {}
+    image_data = data.get("image", "")
+    mode = data.get("mode", "live")
+    
+    if not image_data:
+        return jsonify({"success": False, "message": "No image data"}), 400
+        
+    header, encoded = image_data.split(",", 1)
+    img_bytes = base64.b64decode(encoded)
+    npimg = np.frombuffer(img_bytes, np.uint8)
+    frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+    
+    if frame is None:
+        return jsonify({"success": False, "message": "Invalid image"}), 400
+
+    results = model(frame, conf=0.3)
+    boxes = results[0].boxes.xyxy.cpu().numpy() if results[0].boxes is not None else []
+    
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    res = face_mesh.process(rgb)
+    
+    state_str = "OPEN"
+    ear_val = 0.0
+    left_ear_val = 0.0
+    right_ear_val = 0.0
+    head_tilt = 0.0
+    drowsy = False
+    
+    if res.multi_face_landmarks:
+        h, w, _ = frame.shape
+        lm = res.multi_face_landmarks[0].landmark
+        left_ear_val = ear_calc(lm, LEFT_EYE, w, h)
+        right_ear_val = ear_calc(lm, RIGHT_EYE, w, h)
+        ear_raw = (left_ear_val + right_ear_val) / 2
+        
+        ear_val = 0.7 * state["prev_ear"] + 0.3 * ear_raw
+        state["prev_ear"] = ear_val
+        
+        dx = lm[152].x - lm[10].x
+        dy = lm[152].y - lm[10].y
+        head_tilt = round(np.degrees(np.arctan2(dx, dy)), 2)
+        
+        if mode == "driving":
+            if not state["calibrated"]:
+                state["calibration_ears"].append(ear_raw)
+                state["calibration_count"] += 1
+                if state["calibration_count"] >= 50:
+                    avg_open_ear = sum(state["calibration_ears"]) / len(state["calibration_ears"])
+                    state["calibrated_threshold"] = round(avg_open_ear * 0.75, 3)
+                    state["calibrated"] = True
+                    state["blink_start_time"] = time.time()
+                    state["eye_closed_start_time"] = time.time()
+                
+                cv2.putText(frame, f"CALIBRATING EYE MESH ({state['calibration_count']}/50)",
+                            (20,40), cv2.FONT_HERSHEY_DUPLEX, 0.7, (0,255,255), 2)
+                cv2.putText(frame, "KEEP EYES OPEN & LOOK AHEAD",
+                            (20,70), cv2.FONT_HERSHEY_DUPLEX, 0.6, (0,255,255), 2)
+            else:
+                if ear_val < state["calibrated_threshold"]:
+                    if state["prev_state"] == "OPEN":
+                        state["eye_closed_start_time"] = time.time()
+                    state_str = "CLOSED"
+                    closed_duration = time.time() - state["eye_closed_start_time"]
+                else:
+                    if state["prev_state"] == "CLOSED":
+                        closed_duration = time.time() - state["eye_closed_start_time"]
+                        if 0.05 <= closed_duration <= 0.55:
+                            state["blink_count"] += 1
+                            state["total_blinks"] += 1
+                    state_str = "OPEN"
+                    closed_duration = 0.0
+                    
+                state["prev_state"] = state_str
+                
+                if state["blink_start_time"] is None:
+                    state["blink_start_time"] = time.time()
+                elapsed_time = time.time() - state["blink_start_time"]
+                blink_rate = 0.0
+                if elapsed_time > 10:
+                    blink_rate = (state["blink_count"] / elapsed_time) * 60
+                if elapsed_time > 60:
+                    state["blink_count"] = 0
+                    state["blink_start_time"] = time.time()
+                    
+                drowsy = (closed_duration > 1.0) or (blink_rate > BLINK_HIGH_RATE)
+                
+                if drowsy:
+                    if not state["alert_active"]:
+                        state["alert_active"] = True
+                        state["drowsy_events"] += 1
+                else:
+                    state["alert_active"] = False
+                    
+                state["current_telemetry"] = {
+                    "ear": round(float(ear_val), 4),
+                    "state": state_str,
+                    "blink_rate": round(float(blink_rate), 2),
+                    "total_blinks": int(state["total_blinks"]),
+                    "drowsy": bool(drowsy),
+                    "drowsy_events": int(state["drowsy_events"]),
+                    "active_seconds": int((datetime.now() - state["session_start"]).total_seconds()) if state["session_start"] else 0
+                }
+                
+                if time.time() - state["last_db_write"] > 1:
+                    save_live_data(ear_val, state_str, blink_rate, drowsy, email)
+                    state["last_db_write"] = time.time()
+        else:
+            state_str = "CLOSED" if ear_val < EAR_THRESHOLD else "OPEN"
+    else:
+        state_str = "OFFLINE"
+
+    for box in boxes:
+        x1, y1, x2, y2 = map(int, box)
+        color = (0, 255, 0) if state_str == "OPEN" else (0, 0, 255)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(frame, state_str, (x1, y1 - 10), cv2.FONT_HERSHEY_DUPLEX, 0.6, color, 2)
+
+    _, buffer = cv2.imencode('.jpg', frame)
+    encoded_img = base64.b64encode(buffer).decode('utf-8')
+    
+    response_data = {
+        "success": True,
+        "image": f"data:image/jpeg;base64,{encoded_img}",
+        "ear": round(float(ear_val), 3),
+        "left_ear": round(float(left_ear_val), 3),
+        "right_ear": round(float(right_ear_val), 3),
+        "state": state_str,
+        "head_tilt": head_tilt,
+        "eyes_found": len(boxes),
+        "drowsy": drowsy
+    }
+    
+    if mode == "driving":
+        response_data.update(state["current_telemetry"])
+        
+    return jsonify(response_data)
+
 
 
 
@@ -567,302 +770,31 @@ def detect_image():
         "eyes_found": len(boxes)
     })
 
-def generate_frames():
-
-    global camera
-    camera = cv2.VideoCapture(0)
-
-    while True:
-
-        success, frame = camera.read()
-
-        if not success:
-            break
-
-        results = model(frame, conf=0.3)
-
-        boxes = results[0].boxes.xyxy.cpu().numpy()
-
-        for box in boxes:
-            x1,y1,x2,y2 = map(int, box)
-            cv2.rectangle(frame,(x1,y1),(x2,y2),(0,255,255),2)
-
-        _, buffer = cv2.imencode('.jpg', frame)
-
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' +
-               buffer.tobytes() + b'\r\n')
-
-
 @app.route('/detect-live')
 @login_required
 def detect_live():
-
-    return Response(generate_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
-
-
-def generate_drowsy_frames(username):
-
-    global camera
-    global alert_active
-    global total_blinks
-    global drowsy_events
-    global last_db_write
-    global current_telemetry
-
-    # Reset telemetry state
-    current_telemetry = {
-        "ear": 0.0,
-        "state": "OPEN",
-        "blink_rate": 0.0,
-        "total_blinks": 0,
-        "drowsy": False,
-        "drowsy_events": 0,
-        "active_seconds": 0
-    }
-
-    camera = cv2.VideoCapture(0)
-
-    blink_count = 0
-    blink_start_time = time.time()
-    eye_closed_start_time = time.time()
-
-    prev_state = "OPEN"
-    prev_ear = 0
-
-    # Auto-calibration state
-    calibrated = False
-    calibration_count = 0
-    calibration_ears = []
-    calibrated_threshold = EAR_THRESHOLD
-
-    # YOLO performance optimizations
-    frame_counter = 0
-    last_boxes = []
-
-    while True:
-
-        success, frame = camera.read()
-
-        if not success:
-            break
-
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        res = face_mesh.process(rgb)
-
-        state = "OPEN"
-
-        if res.multi_face_landmarks:
-
-            h,w,_ = frame.shape
-            lm = res.multi_face_landmarks[0].landmark
-
-            left_ear = ear_calc(lm, LEFT_EYE, w, h)
-            right_ear = ear_calc(lm, RIGHT_EYE, w, h)
-
-            ear_raw = (left_ear + right_ear)/2
-            ear = 0.7*prev_ear + 0.3*ear_raw
-            prev_ear = ear
-
-            # Auto-calibration phase (Collect 50 frames with open eyes)
-            if not calibrated:
-                calibration_ears.append(ear_raw)
-                calibration_count += 1
-                
-                if calibration_count >= 50:
-                    avg_open_ear = sum(calibration_ears) / len(calibration_ears)
-                    calibrated_threshold = round(avg_open_ear * 0.75, 3) # 75% of baseline EAR
-                    calibrated = True
-                    blink_start_time = time.time() # Reset clock after calibration
-                    eye_closed_start_time = time.time()
-                    print(f"Calibration Completed! Base EAR: {avg_open_ear:.3f}, Threshold set to: {calibrated_threshold:.3f}")
-                
-                cv2.putText(frame, f"CALIBRATING EYE MESH ({calibration_count}/50)",
-                            (20,40),
-                            cv2.FONT_HERSHEY_DUPLEX,
-                            0.7,
-                            (0,255,255),
-                            2)
-                cv2.putText(frame, "KEEP EYES OPEN & LOOK AHEAD",
-                            (20,70),
-                            cv2.FONT_HERSHEY_DUPLEX,
-                            0.6,
-                            (0,255,255),
-                            2)
-                
-                _, buffer = cv2.imencode('.jpg', frame)
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' +
-                       buffer.tobytes() + b'\r\n')
-                continue
-
-            # Standard detection phase (post-calibration) using time-based limits
-            if ear < calibrated_threshold:
-                if prev_state == "OPEN":
-                    eye_closed_start_time = time.time()
-                state = "CLOSED"
-                closed_duration = time.time() - eye_closed_start_time
-            else:
-                if prev_state == "CLOSED":
-                    closed_duration = time.time() - eye_closed_start_time
-                    if 0.05 <= closed_duration <= 0.55:
-                        blink_count += 1
-                        total_blinks += 1
-                state = "OPEN"
-                closed_duration = 0.0
-
-            prev_state = state
-
-            elapsed_time = time.time() - blink_start_time
-
-            blink_rate = 0
-
-            if elapsed_time > 10:
-                blink_rate = (blink_count/elapsed_time)*60
-
-            if elapsed_time > 60:
-                blink_count = 0
-                blink_start_time = time.time()
-
-            drowsy = (closed_duration > 1.0) or (blink_rate > BLINK_HIGH_RATE)
-
-            if drowsy:
-                if not alert_active:
-                    alert_active = True
-                    drowsy_events += 1
-            else:
-                alert_active = False
-
-            # Update live stats in memory
-            current_telemetry["ear"] = round(float(ear), 4)
-            current_telemetry["state"] = state
-            current_telemetry["blink_rate"] = round(float(blink_rate), 2)
-            current_telemetry["total_blinks"] = int(total_blinks)
-            current_telemetry["drowsy"] = bool(drowsy)
-            current_telemetry["drowsy_events"] = int(drowsy_events)
-            if session_start:
-                current_telemetry["active_seconds"] = int((datetime.now() - session_start).total_seconds())
-
-            if time.time() - last_db_write > 1:
-                save_live_data(ear, state, blink_rate, drowsy, username)
-                last_db_write = time.time()
-
-            color = (0,255,0) if state=="OPEN" else (0,0,255)
-
-            cv2.putText(frame,f"{state} EAR:{ear:.2f} (Thresh:{calibrated_threshold:.2f})",
-                        (20,40),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        0.7,
-                        color,
-                        2)
-
-            cv2.putText(frame,f"Blinks: {total_blinks}",
-                        (20,80),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        0.7,
-                        (255,255,0),
-                        2)
-
-            cv2.putText(frame,f"Blink Rate: {int(blink_rate)} /min",
-                        (20,110),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        0.7,
-                        (255,255,0),
-                        2)
-
-            if drowsy:
-
-                cv2.putText(frame,"DROWSY ALERT!",
-                            (20,160),
-                            cv2.FONT_HERSHEY_DUPLEX,
-                            1.3,
-                            (0,0,255),
-                            4)
-
-        frame_counter += 1
-        if frame_counter % 5 == 0:
-            results = model(frame, conf=0.3)
-            if results[0].boxes is not None:
-                last_boxes = results[0].boxes.xyxy.cpu().numpy()
-            else:
-                last_boxes = []
-
-        for box in last_boxes:
-            x1,y1,x2,y2 = map(int,box)
-            color = (0,255,0) if state=="OPEN" else (0,0,255)
-            cv2.rectangle(frame,(x1,y1),(x2,y2),color,2)
-            cv2.putText(frame,state,
-                        (x1,y1-10),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        0.7,
-                        color,
-                        2)
-
-        _,buffer=cv2.imencode('.jpg',frame)
-
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' +
-               buffer.tobytes()+b'\r\n')
+    return "Streaming is now client-side."
 
 
 @app.route('/detect-drowsy')
 @login_required
 def detect_drowsy():
-    email = session.get('email')
-    return Response(generate_drowsy_frames(email),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return "Streaming is now client-side."
 
 
 @app.route('/stop-live')
 @login_required
 def stop_live():
-
-    global camera
-    global session_start
-    global total_blinks
-    global drowsy_events
-    global current_telemetry
-
-    email = session.get('email')
-
-    if camera:
-        camera.release()
-        camera=None
-
-    if session_start:
-
-        end_time = datetime.now()
-        duration_seconds = (end_time - session_start).total_seconds()
-
-        save_session(session_start, end_time, duration_seconds, total_blinks, drowsy_events, email)
-
-        session_start = None
-
-    # Reset telemetry
-    current_telemetry = {
-        "ear": 0.0,
-        "state": "OPEN",
-        "blink_rate": 0.0,
-        "total_blinks": 0,
-        "drowsy": False,
-        "drowsy_events": 0,
-        "active_seconds": 0
-    }
-
-    return "Camera stopped"
-
-
-@app.route('/history')
-@login_required
-def history():
-    return render_template("history.html")
+    # Deprecated: client calls /api/stop-session now
+    return "Stopped"
 
 
 @app.route('/api/live-stats')
 @login_required
 def api_live_stats():
-    return jsonify(current_telemetry)
+    email = session.get('email')
+    state = get_driver_state(email)
+    return jsonify(state["current_telemetry"])
 
 
 @app.route('/api/history')

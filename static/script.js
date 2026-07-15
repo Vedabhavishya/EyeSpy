@@ -84,6 +84,80 @@ function uploadImage() {
 }
 
 
+/* ---------------- CLIENT-SIDE WEBCAM CAPTURE & PROCESSING ---------------- */
+
+let localStream = null;
+let captureInterval = null;
+
+function setupWebcam(videoEl, callback) {
+    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+        .then(stream => {
+            localStream = stream;
+            videoEl.srcObject = stream;
+            videoEl.onloadedmetadata = () => {
+                videoEl.play();
+                if (callback) callback();
+            };
+        })
+        .catch(err => {
+            console.error("Error accessing webcam:", err);
+            alert("Could not access webcam. Please check permissions in your browser.");
+        });
+}
+
+function stopWebcam() {
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    if (captureInterval) {
+        clearInterval(captureInterval);
+        captureInterval = null;
+    }
+}
+
+function captureAndProcessFrame(videoEl, canvasEl, imgEl, mode, callback) {
+    const ctx = canvasEl.getContext("2d");
+    
+    canvasEl.width = 640;
+    canvasEl.height = 480;
+    
+    captureInterval = setInterval(() => {
+        if (!localStream || videoEl.paused || videoEl.ended) return;
+        
+        ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+        
+        // Convert canvas frame to base64 JPEG
+        const dataURL = canvasEl.toDataURL("image/jpeg", 0.7);
+        
+        // POST to stateless backend API
+        fetch("/api/process-frame", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                image: dataURL,
+                mode: mode
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Frame processing error");
+            return res.json();
+        })
+        .then(data => {
+            if (data.success) {
+                imgEl.src = data.image;
+                if (callback) callback(data);
+            }
+        })
+        .catch(err => {
+            console.warn("Frame process warning:", err);
+        });
+    }, 200); // 5 frames per second balance for smooth annotations and network conservation
+}
+
+
 /* ---------------- LIVE MODE ---------------- */
 
 let isLiveRunning = false;
@@ -97,32 +171,40 @@ function toggleLive() {
 }
 
 function startLive() {
+    const videoEl = document.getElementById("webcamVideo");
+    const canvasEl = document.getElementById("offscreenCanvas");
     const streamImg = document.getElementById("liveStream");
     const noFeed = document.getElementById("noFeed");
     const btn = document.getElementById("liveToggleBtn");
 
-    streamImg.src = "/detect-live";
-    if(noFeed){
-        noFeed.classList.add("hidden");
-    }
+    if (!videoEl || !canvasEl || !streamImg) return;
 
-    btn.innerText = "Stop Vision Feed";
-    btn.style.background = "#ef4444";
-    isLiveRunning = true;
+    setupWebcam(videoEl, () => {
+        if (noFeed) {
+            noFeed.classList.add("hidden");
+        }
+        btn.innerText = "Stop Vision Feed";
+        btn.style.background = "#ef4444";
+        isLiveRunning = true;
+        
+        captureAndProcessFrame(videoEl, canvasEl, streamImg, "live");
+    });
 }
 
 function stopLive() {
-    const streamImg = document.getElementById("liveStream");
     const noFeed = document.getElementById("noFeed");
     const btn = document.getElementById("liveToggleBtn");
+    const streamImg = document.getElementById("liveStream");
 
-    streamImg.src = "";
-    if(noFeed){
+    stopWebcam();
+    if (streamImg) {
+        streamImg.src = "";
+    }
+    if (noFeed) {
         noFeed.classList.remove("hidden");
     }
 
-    fetch("/stop-live").catch(()=>{});
-    if(btn){
+    if (btn) {
         btn.innerText = "Start Intelligence Feed";
         btn.style.background = "var(--primary)";
     }
@@ -133,7 +215,6 @@ function stopLive() {
 /* ---------------- DRIVING MODE ---------------- */
 
 let isDrivingRunning = false;
-let pollingInterval = null;
 let alertAudio = null;
 
 function toggleDriving() {
@@ -145,21 +226,41 @@ function toggleDriving() {
 }
 
 function startDriving() {
+    const videoEl = document.getElementById("webcamVideo");
+    const canvasEl = document.getElementById("offscreenCanvas");
     const streamImg = document.getElementById("drivingStream");
     const status = document.getElementById("drivingStatus");
     const btn = document.getElementById("drivingToggleBtn");
 
-    streamImg.src = "/detect-drowsy";
-    if(status){
-        status.classList.add("hidden");
-    }
+    if (!videoEl || !canvasEl || !streamImg) return;
 
-    btn.innerText = "Stop Driving Mode";
-    btn.style.background = "#ef4444";
-    isDrivingRunning = true;
+    fetch("/api/start-session", { method: "POST" })
+        .then(res => res.json())
+        .then(resData => {
+            if (resData.success) {
+                alertAudio = document.getElementById('alertAudio');
+                
+                setupWebcam(videoEl, () => {
+                    if (status) {
+                        status.classList.add("hidden");
+                    }
 
-    // Start background polling for audio alerts
-    startPolling();
+                    btn.innerText = "Stop Driving Mode";
+                    btn.style.background = "#ef4444";
+                    isDrivingRunning = true;
+
+                    captureAndProcessFrame(videoEl, canvasEl, streamImg, "driving", (data) => {
+                        updateDashboard(data);
+                    });
+                });
+            } else {
+                alert("Error starting driving session: " + resData.message);
+            }
+        })
+        .catch(err => {
+            console.error("Error starting driving session:", err);
+            alert("Could not start driving session.");
+        });
 }
 
 function stopDriving() {
@@ -167,38 +268,21 @@ function stopDriving() {
     const status = document.getElementById("drivingStatus");
     const btn = document.getElementById("drivingToggleBtn");
 
-    streamImg.src = "";
-    if(status){
+    stopWebcam();
+    if (streamImg) {
+        streamImg.src = "";
+    }
+    if (status) {
         status.classList.remove("hidden");
     }
 
-    fetch("/stop-live").catch(()=>{});
-    btn.innerText = "Start Monitoring";
-    btn.style.background = "var(--primary)";
-    isDrivingRunning = false;
-
-    // Stop background polling and clear audio
-    stopPolling();
-}
-
-function startPolling() {
-    alertAudio = document.getElementById('alertAudio');
-
-    pollingInterval = setInterval(() => {
-        fetch('/api/live-stats')
-            .then(res => res.json())
-            .then(data => {
-                updateDashboard(data);
-            })
-            .catch(err => console.error("Error fetching live stats:", err));
-    }, 500);
-}
-
-function stopPolling() {
-    if (pollingInterval) {
-        clearInterval(pollingInterval);
-        pollingInterval = null;
+    fetch("/api/stop-session", { method: "POST" }).catch(() => {});
+    
+    if (btn) {
+        btn.innerText = "Start Monitoring";
+        btn.style.background = "var(--primary)";
     }
+    isDrivingRunning = false;
 
     if (alertAudio) {
         alertAudio.pause();
@@ -218,10 +302,9 @@ function updateDashboard(data) {
     const videoWrapper = document.getElementById("videoWrapper");
     const alarmOverlay = document.getElementById("alarmOverlay");
 
-    // Audio & HUD Warning trigger
     if (data.drowsy) {
         if (alertAudio && alertAudio.paused) {
-            alertAudio.play().catch(e => console.warn("Browser blocked auto-playback of sound until user interaction."));
+            alertAudio.play().catch(e => console.warn("Audio playback blocked by browser settings."));
         }
         if (videoWrapper) videoWrapper.classList.add("drowsy-active");
         if (alarmOverlay) alarmOverlay.classList.remove("hidden");

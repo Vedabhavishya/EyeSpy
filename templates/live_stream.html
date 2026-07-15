@@ -50,11 +50,10 @@ Start Intelligence Feed
 <div class="live-viewer">
 
 <div class="viewer-wrapper">
-
-<img id="liveStream" src="" alt="Live feed">
-
-<div id="noFeed" class="status-overlay">Camera Offline</div>
-
+    <video id="webcamVideo" autoplay playsinline style="display: none;"></video>
+    <canvas id="offscreenCanvas" style="display: none;"></canvas>
+    <img id="liveStream" src="" alt="Live feed">
+    <div id="noFeed" class="status-overlay">Camera Offline</div>
 </div>
 
 </div>
