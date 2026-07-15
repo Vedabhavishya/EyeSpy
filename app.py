@@ -204,6 +204,9 @@ def db_update_profile(email, full_name, phone, age):
 MODEL_PATH = r"C:\Users\vedab\runs\detect\train18\weights\best.pt"
 
 if not os.path.exists(MODEL_PATH):
+    MODEL_PATH = "yolov8n.pt"
+
+if not os.path.exists(MODEL_PATH):
     raise FileNotFoundError("Model file not found.")
 
 model = YOLO(MODEL_PATH)
